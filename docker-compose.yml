@@ -1,99 +1,124 @@
-version: '2'
+version: '3'
 
 services:
   config-server:
     image: springcommunity/spring-petclinic-config-server
-    container_name: config-server
-    mem_limit: 512M
-    ports:
-     - 8888:8888
+    networks:
+      network:
+    volumes:
+      - type: bind
+        source: ./spring-petclinic-microservices-config
+        target: /var/run/config
+        read_only: true
+    environment:
+     - GIT_REPO=/var/run/config
+     - SPRING_PROFILES_ACTIVE=native
+    restart: unless-stopped
 
   discovery-server:
     image: springcommunity/spring-petclinic-discovery-server
-    container_name: discovery-server
-    mem_limit: 512M
+    networks:
+      network:
     depends_on:
       - config-server
     entrypoint: ["./dockerize","-wait=tcp://config-server:8888","-timeout=60s","--","java", "org.springframework.boot.loader.JarLauncher"]
-    ports:
-     - 8761:8761
+    restart: unless-stopped
 
   customers-service:
     image: springcommunity/spring-petclinic-customers-service
-    container_name: customers-service
-    mem_limit: 512M
+    networks:
+      network:
     depends_on:
      - config-server
      - discovery-server
+     - mysql-service
     entrypoint: ["./dockerize","-wait=tcp://discovery-server:8761","-timeout=60s","--","java", "org.springframework.boot.loader.JarLauncher"]
-    ports:
-    - 8081:8081
+    environment:
+     - SPRING_PROFILES_ACTIVE=docker,mysql
+    restart: unless-stopped
 
   visits-service:
     image: springcommunity/spring-petclinic-visits-service
-    container_name: visits-service
-    mem_limit: 512M
+    networks:
+      network:
     depends_on:
      - config-server
      - discovery-server
+     - mysql-service
     entrypoint: ["./dockerize","-wait=tcp://discovery-server:8761","-timeout=60s","--","java", "org.springframework.boot.loader.JarLauncher"]
-    ports:
-     - 8082:8082
+    environment:
+     - SPRING_PROFILES_ACTIVE=docker,mysql
+    restart: unless-stopped
 
   vets-service:
     image: springcommunity/spring-petclinic-vets-service
-    container_name: vets-service
-    mem_limit: 512M
+    networks:
+      network:
     depends_on:
      - config-server
      - discovery-server
+     - mysql-service
     entrypoint: ["./dockerize","-wait=tcp://discovery-server:8761","-timeout=60s","--","java", "org.springframework.boot.loader.JarLauncher"]
-    ports:
-     - 8083:8083
+    environment:
+     - SPRING_PROFILES_ACTIVE=docker,mysql
+    restart: unless-stopped
 
   api-gateway:
     image: springcommunity/spring-petclinic-api-gateway
-    container_name: api-gateway
-    mem_limit: 512M
+    networks:
+      network:
     depends_on:
      - config-server
      - discovery-server
     entrypoint: ["./dockerize","-wait=tcp://discovery-server:8761","-timeout=60s","--","java", "org.springframework.boot.loader.JarLauncher"]
     ports:
-     - 8080:8080
+     - "127.0.0.1:8088:8080"
+    restart: unless-stopped
 
   tracing-server:
     image: openzipkin/zipkin
-    container_name: tracing-server
-    mem_limit: 512M
+    networks:
+      network:
     environment:
     - JAVA_OPTS=-XX:+UnlockExperimentalVMOptions -Djava.security.egd=file:/dev/./urandom
-    ports:
-     - 9411:9411
+    restart: unless-stopped
 
   admin-server:
     image: springcommunity/spring-petclinic-admin-server
-    container_name: admin-server
-    mem_limit: 512M
+    networks:
+      network:
     depends_on:
      - config-server
      - discovery-server
     entrypoint: ["./dockerize","-wait=tcp://discovery-server:8761","-timeout=60s","--","java", "org.springframework.boot.loader.JarLauncher"]
-    ports:
-     - 9090:9090
+    # ports:
+     # - "127.0.0.1:8089:9090"
+    restart: unless-stopped
+
+  mysql-service:
+    image: mysql:5.7.8
+    networks:
+      network:
+    environment:
+      - MYSQL_ROOT_PASSWORD=petclinic
+      - MYSQL_DATABASE=petclinic
+    restart: unless-stopped
 
   ## Grafana / Prometheus
 
   grafana-server:
     build: ./docker/grafana
-    container_name: grafana-server
-    mem_limit: 256M
+    networks:
+      network:
     ports:
-    - 3000:3000
+    - "127.0.0.1:8087:3000"
+    restart: unless-stopped
 
   prometheus-server:
     build: ./docker/prometheus
-    container_name: prometheus-server
-    mem_limit: 256M
-    ports:
-    - 9091:9090
+    networks:
+      network:
+    restart: unless-stopped
+
+networks:
+  network:
