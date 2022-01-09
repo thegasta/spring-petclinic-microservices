@@ -19,8 +19,8 @@ WORKDIR application
 # Dockerize
 COPY --from=builder application/dockerize ./
 
-ARG EXPOSED_PORT
-EXPOSE ${EXPOSED_PORT}
+# ARG EXPOSED_PORT
+# EXPOSE ${EXPOSED_PORT}
 
 ENV SPRING_PROFILES_ACTIVE docker
 
